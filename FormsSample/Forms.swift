@@ -11,7 +11,7 @@ import UIKit
 class Section {
     let cells: [FormCell]
     var footerTitle: String?
-    init(cells: [FormCell], footerTitle: String?) {
+    init(cells: [FormCell], footerTitle: String? = nil) {
         self.cells = cells
         self.footerTitle = footerTitle
     }
@@ -24,7 +24,7 @@ class FormCell: UITableViewCell {
 
 class FormViewController: UITableViewController {
     var sections: [Section] = []
-    var firstResponder: UIResponder?
+    @objc var firstResponder: UIResponder?
     
     func reloadSectionFooters() {
         UIView.setAnimationsEnabled(false)
@@ -39,12 +39,15 @@ class FormViewController: UITableViewController {
         UIView.setAnimationsEnabled(true)
     }
     
+    func reloadSections() {
+        tableView.reloadData()
+    }
     
     init(sections: [Section], title: String, firstResponder: UIResponder? = nil) {
         self.firstResponder = firstResponder
         self.sections = sections
         super.init(style: .grouped)
-        navigationItem.title = title
+        self.title = title
     }
     
     required init?(coder aDecoder: NSCoder) {
@@ -67,8 +70,6 @@ class FormViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return sections[section].cells.count
     }
-    
-    
     
     func cell(for indexPath: IndexPath) -> FormCell {
         return sections[indexPath.section].cells[indexPath.row]
@@ -95,26 +96,37 @@ class FormViewController: UITableViewController {
 class FormDriver<State> {
     var formViewController: FormViewController!
     var rendered: RenderedElement<[Section], State>!
+    var context: RenderingContext<State>!
+    
+    let build: (RenderingContext<State>) -> RenderedElement<[Section], State>
     
     var state: State {
         didSet {
+            context._replace(state)
+            rendered = build(context)
             rendered.update(state)
+            
+            formViewController.sections = rendered.element
+            formViewController.reloadSections()
             formViewController.reloadSectionFooters()
         }
     }
     
-    init(initial state: State, build: (RenderingContext<State>) -> RenderedElement<[Section], State>) {
+    init(initial state: State, title: String, build: @escaping (RenderingContext<State>) -> RenderedElement<[Section], State>) {
         self.state = state
-        let context = RenderingContext(state: state, change: { [unowned self] f in
+        self.build = build
+        
+        self.context = RenderingContext(state: state, change: { [unowned self] f in
             f(&self.state)
-        }, pushViewController: { [unowned self] vc in
+            }, pushViewController: { [unowned self] vc in
                 self.formViewController.navigationController?.pushViewController(vc, animated: true)
-        }, popViewController: {
+            }, popViewController: {
                 self.formViewController.navigationController?.popViewController(animated: true)
         })
-        self.rendered = build(context)
+        self.rendered = build(self.context)
         rendered.update(state)
-        formViewController = FormViewController(sections: rendered.element, title: "Personal Hotspot Settings")
+        
+        formViewController = FormViewController(sections: rendered.element, title: title)
     }
 }
 
@@ -135,7 +147,15 @@ struct RenderedElement<Element, State> {
 }
 
 struct RenderingContext<State> {
-    let state: State
+    private(set) var state: State
+    
+    // HACK/XXX: An ugly mechanism for replacing the contents of the current
+    // state in its entirety. This is required in order to get rebuilding the
+    // forms to work.
+    fileprivate mutating func _replace(_ state: State) {
+        self.state = state
+    }
+    
     let change: ((inout State) -> ()) -> ()
     let pushViewController: (UIViewController) -> ()
     let popViewController: () -> ()

@@ -34,33 +34,34 @@ func hotspotForm(context: RenderingContext<Hotspot>) -> RenderedElement<[Section
         renderedToggle.element.trailingAnchor.constraint(equalTo: toggleCell.contentView.layoutMarginsGuide.trailingAnchor)
         ])
     
-    
-    let passwordCell = FormCell(style: .value1, reuseIdentifier: nil)
-    passwordCell.textLabel?.text = "Password"
-    passwordCell.accessoryType = .disclosureIndicator
-    passwordCell.shouldHighlight = true
-    updates.append { state in
-        passwordCell.detailTextLabel?.text = state.password
-    }
-
-    let renderedPasswordForm = buildPasswordForm(context)
-    let nested = FormViewController(sections: renderedPasswordForm.element, title: "Personal Hotspot Password")
-    passwordCell.didSelect = {
-        context.pushViewController(nested)
-    }
-    
     let toggleSection = Section(cells: [toggleCell], footerTitle: nil)
     updates.append { state in
         toggleSection.footerTitle = state.enabledSectionTitle
     }
+    
+    var sections = [toggleSection]
+    
+    if context.state.isEnabled {
+        let passwordCell = FormCell(style: .value1, reuseIdentifier: nil)
+        passwordCell.textLabel?.text = "Password"
+        passwordCell.accessoryType = .disclosureIndicator
+        passwordCell.shouldHighlight = true
+        updates.append { state in
+            passwordCell.detailTextLabel?.text = state.password
+        }
 
-    return RenderedElement(element: [
-        toggleSection,
-        Section(cells: [
-            passwordCell
-            ], footerTitle: nil),
-    ], strongReferences: strongReferences + renderedPasswordForm.strongReferences) { state in
-        renderedPasswordForm.update(state)
+        let renderedPasswordForm = buildPasswordForm(context)
+        let nested = FormViewController(sections: renderedPasswordForm.element, title: "Personal Hotspot Password")
+        passwordCell.didSelect = {
+            context.pushViewController(nested)
+        }
+        
+        sections.append(Section(cells: [passwordCell], footerTitle: nil))
+        strongReferences.append(contentsOf: renderedPasswordForm.strongReferences)
+        updates.append { renderedPasswordForm.update($0) }
+    }
+
+    return RenderedElement(element: sections, strongReferences: strongReferences) { state in
         for u in updates {
             u(state)
         }

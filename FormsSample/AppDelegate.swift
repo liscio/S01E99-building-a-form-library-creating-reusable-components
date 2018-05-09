@@ -13,7 +13,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
     let navigationController = UINavigationController()
-    let driver = FormDriver(initial: Hotspot(), build: hotspotForm)
+    let driver = FormDriver(initial: Hotspot(), title: "Personal Hotspot Settings", build: hotspotForm)
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
         window = UIWindow()
